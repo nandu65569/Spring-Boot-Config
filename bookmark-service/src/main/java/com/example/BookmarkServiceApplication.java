@@ -98,7 +98,9 @@ class BookmarkRestController {
 
 	@HystrixCommand(fallbackMethod = "bookmarksFallback")
 	@RequestMapping("/{userId}/bookmarks")
-	Collection<Bookmark> bookmarks(@PathVariable String userId) {
+	Collection<Bookmark> bookmarks(@PathVariable String userId)
+	{
+
 		return this.bookmarkRepository.findByUserId(userId);
 	}
 }
