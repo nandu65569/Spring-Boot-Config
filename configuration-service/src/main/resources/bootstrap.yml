@@ -6,8 +6,8 @@ spring:
     config:
       server:
         git:
-          uri: https://github.com/techyvenki/microservices-poc.git
-          search-paths: ConfigData
+          uri: https://github.com/nandu65569/Spring-Boot-Config.git
+          search-paths: ConfigInfo
   application:
     name: configuration-service
 

@@ -7,5 +7,3 @@ spring:
 
 server:
   port: 8002
-
-message: ContactService!!!!!!!!!

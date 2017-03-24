@@ -1,6 +1,11 @@
 package com.example;
 
+import com.netflix.client.config.IClientConfig;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
+import com.netflix.loadbalancer.AvailabilityFilteringRule;
+import com.netflix.loadbalancer.IPing;
+import com.netflix.loadbalancer.IRule;
+import com.netflix.loadbalancer.PingUrl;
 import org.apache.commons.lang.builder.ToStringBuilder;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -14,6 +19,7 @@ import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.cloud.netflix.feign.EnableFeignClients;
 import org.springframework.cloud.netflix.feign.FeignClient;
+import org.springframework.cloud.netflix.ribbon.RibbonClient;
 import org.springframework.cloud.netflix.zuul.EnableZuulProxy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.ParameterizedTypeReference;
@@ -21,10 +27,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.Arrays;
@@ -34,8 +37,10 @@ import java.util.List;
 @SpringCloudApplication
 @EnableFeignClients
 @EnableZuulProxy
+@RibbonClient(name = "bookmark-service", configuration = BookmarkConfiguration.class)
 public class PassportServiceApplication {
 
+	@LoadBalanced
 	@Bean
 	public RestTemplate restTemplate() {
 		return new RestTemplate();
@@ -63,13 +68,13 @@ public class PassportServiceApplication {
 	}
 }
 
-@FeignClient("bookmark-service")
+@FeignClient("BOOKMARK-SERVICE")
 interface BookmarkClient {
 	@RequestMapping(method = RequestMethod.GET, value = "/{userId}/bookmarks")
 	Collection<Bookmark> getBookmarks(@PathVariable("userId") String userId);
 }
 
-@FeignClient("contact-service")
+@FeignClient("CONTACT-SERVICE")
 interface ContactClient {
 	@RequestMapping(method = RequestMethod.GET, value = "/{userId}/contacts")
 	Collection<Contact> getContacts(@PathVariable("userId") String userId);
@@ -116,16 +121,16 @@ class RestTemplateExample implements CommandLineRunner {
 				new ParameterizedTypeReference<List<Contact>>() {};
 
 		ResponseEntity<List<Bookmark>> bookmarks = this.restTemplate.exchange(
-				"http://localhost:8003/bookmark-service/{userId}/bookmarks",
+				"http://BOOKMARK-SERVICE/{userId}/bookmarks",
 				HttpMethod.GET, null, bookmarksResponseType, (Object) "Myntra");
 		bookmarks.getBody().forEach(System.out::println);
 
 		System.out.println("------------------------------");
 
 		ResponseEntity<List<Contact>> contacts = this.restTemplate.exchange(
-				"http://localhost:8003/contact-service/{userId}/contacts",
+				"http://CONTACT-SERVICE/{userId}/contacts",
 				HttpMethod.GET, null, contactsResponseType, (Object) "Myntra");
-		bookmarks.getBody().forEach(System.out::println);
+		contacts.getBody().forEach(System.out::println);
 	}
 }
 
@@ -189,10 +194,23 @@ class PassportRestController {
 	@Autowired
 	private ServicesRepo servicesRepo;
 
+	@Autowired
+	private RestTemplate restTemplate;
+
+	@Autowired
+	DiscoveryClient client;
+
 	@RequestMapping("/{userId}/passport")
 	Passport passport(@PathVariable String userId) {
 		return new Passport(userId,servicesRepo.getContacts(userId),servicesRepo.getBookmarks(userId));
 	}
+
+	@RequestMapping("/bookmarks")
+	public String allBookMarks(@RequestParam(value="name", defaultValue="Google") String name) {
+		String instance= restTemplate.getForObject("http://BOOKMARK-SERVICE/instance", String.class);
+		return instance;
+	}
+
 }
 
 class Passport {
@@ -350,4 +368,21 @@ class Bookmark {
 	public void setUserId(String userId) {
 		this.userId = userId;
 	}
+}
+
+class BookmarkConfiguration {
+
+	@Autowired
+	IClientConfig ribbonClientConfig;
+
+	@Bean
+	public IPing ribbonPing(IClientConfig config) {
+		return new PingUrl();
+	}
+
+	@Bean
+	public IRule ribbonRule(IClientConfig config) {
+		return new AvailabilityFilteringRule();
+	}
+
 }

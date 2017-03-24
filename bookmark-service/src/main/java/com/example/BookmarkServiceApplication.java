@@ -6,8 +6,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.SpringCloudApplication;
 import org.springframework.cloud.client.circuitbreaker.EnableCircuitBreaker;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.cloud.netflix.eureka.EnableEurekaClient;
@@ -75,6 +77,19 @@ class BookmarkRestController {
 	@Autowired
 	private BookmarkRepository bookmarkRepository;
 
+	@Autowired
+	DiscoveryClient client;
+
+	private String helloFallback(){
+		return "Service Failure!!!";
+	}
+
+	@HystrixCommand(fallbackMethod = "helloFallback")
+	@RequestMapping("/instance")
+	public String hello() {
+		ServiceInstance localInstance = client.getLocalServiceInstance();
+		return "Hello World: "+ localInstance.getServiceId()+":"+localInstance.getHost()+":"+localInstance.getPort();
+	}
 
 	private Collection<Bookmark> bookmarksFallback(String userId){
 		System.out.println("bookmarksFallback");
